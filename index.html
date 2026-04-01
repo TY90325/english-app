@@ -1004,10 +1004,10 @@ async function aiTeach(title){
   a.innerHTML=`<div class="ai-wrap"><div class="ai-head"><div class="ai-av">🤖</div><div class="ai-nm">Arcane AI 老師</div></div><div class="ai-bbl"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>`;
   a.scrollIntoView({behavior:'smooth'});
   try{
-    const r=await fetch('https://english-rpg-backend-production.up.railway.app/ai/tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:`你是台灣國中高中英文老師，語氣生動幽默，說話風格像奇幻RPG的智者法師。請用繁體中文講解「${title}」這個英文文法。包含：①核心規則(清楚說明) ②最常犯的錯誤(附正確vs錯誤例句) ③2個生活化例句(附中文翻譯) ④一句話記憶法。字數190字以內，語氣活潑有力！`}]})});
+    const r=await fetch('https://english-rpg-backend-production.up.railway.app/ai/tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player_id:'guest',message:`你是台灣國中高中英文老師，語氣生動幽默，說話風格像奇幻RPG的智者法師。請用繁體中文講解「${title}」這個英文文法。包含：①核心規則(清楚說明) ②最常犯的錯誤(附正確vs錯誤例句) ③2個生活化例句(附中文翻譯) ④一句話記憶法。字數190字以內，語氣活潑有力！`,history:[]})});
     const d=await r.json();
-    a.innerHTML=`<div class="ai-wrap"><div class="ai-head"><div class="ai-av">🤖</div><div class="ai-nm">Arcane AI 老師</div></div><div class="ai-bbl">${(d.content?.[0]?.text||'法師正在閉關...').replace(/\n/g,'<br>')}</div></div>`;
-  }catch{a.innerHTML=`<div class="ai-wrap"><div class="ai-head"><div class="ai-av">🤖</div><div class="ai-nm">Arcane AI 老師</div></div><div class="ai-bbl">✦ 需設定 Anthropic API Key 才能啟動 AI 講解功能！</div></div>`}
+    a.innerHTML=`<div class="ai-wrap"><div class="ai-head"><div class="ai-av">🤖</div><div class="ai-nm">Arcane AI 老師</div></div><div class="ai-bbl">${(d.reply||'法師正在閉關...').replace(/\n/g,'<br>')}</div></div>`;
+  }catch(e){a.innerHTML=`<div class="ai-wrap"><div class="ai-head"><div class="ai-av">🤖</div><div class="ai-nm">Arcane AI 老師</div></div><div class="ai-bbl">✦ AI 連線失敗，請稍後再試！</div></div>`}
 }
 
 async function runQuiz(title){
@@ -1015,24 +1015,34 @@ async function runQuiz(title){
   a.innerHTML=`<div style="padding:20px;text-align:center"><div class="spinner" style="margin:0 auto 10px"></div><div style="font-size:11px;color:var(--text3)">魔法試煉生成中...</div></div>`;
   a.scrollIntoView({behavior:'smooth'});
   try{
-    const r=await fetch('https://english-rpg-backend-production.up.railway.app/ai/question',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:`請為台灣國中高中學生出3道「${title}」的英文文法選擇題(4選1)。只回傳純JSON：{"questions":[{"q":"題目","options":["A","B","C","D"],"answer":0,"explain":"解說"}]}，不要其他文字。`}]})});
+    const r=await fetch('https://english-rpg-backend-production.up.railway.app/ai/question',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player_id:'guest',zone:title,weak_types:[title]})});
     const d=await r.json();
-    let txt=(d.content?.[0]?.text||'{}').replace(/```json|```/g,'').trim();
-    const p=JSON.parse(txt);
+    const q=d.question;
     let h='<div class="quiz-area">';
-    (p.questions||[]).forEach((q,qi)=>{
-      h+=`<div class="q-card"><div class="q-num">✦ Q${qi+1}</div><div class="q-txt">${q.q}</div><div class="q-opts">`;
-      q.options.forEach((o,oi)=>h+=`<div class="q-opt" onclick="ansQ(${qi},${oi},${q.answer},'${q.explain||''}')" data-opt="${oi}">${o}</div>`);
-      h+='</div></div>';
-    });
+    h+=`<div class="q-card"><div class="q-num">✦ Q1</div><div class="q-txt">${q.question}</div><div class="q-opts">`;
+    q.options.forEach((o,oi)=>h+=`<div class="q-opt" onclick="ansQ(0,${oi},${q.answer_index},'${(q.explanation||'').replace(/'/g,"\'")}',this)">${o}</div>`);
+    h+='</div></div>';
     h+='</div>';
     a.innerHTML=h;
-    
   }catch(e){
     a.innerHTML='<div style="padding:20px;color:var(--red)">⚠️ AI出題失敗，請稍後再試</div>';
   }
 }
 
+
+function ansQ(qi,oi,correct,explain,el){
+  document.querySelectorAll(`[data-opt]`).forEach(b=>b.onclick=null);
+  if(oi===correct){
+    el.classList.add('right');
+    el.insertAdjacentHTML('afterend',`<div class="q-exp ok">✅ 正確！${explain}</div>`);
+    addXP(10); toast('✦ 正確！+10 XP');
+  }else{
+    el.classList.add('wrong');
+    document.querySelectorAll('[data-opt]')[correct].classList.add('right');
+    el.insertAdjacentHTML('afterend',`<div class="q-exp ng">❌ 答錯了！${explain}</div>`);
+    toast('✕ 答錯了！');
+  }
+}
 function openV(l){
   S.vocabLv=l; S.selDays=[1];
   document.getElementById('wlT').textContent={j:'國中 2000 單',s:'高中 7000 單',g:'GRE 10000 單'}[l];
